@@ -17,16 +17,27 @@
             /* outline: 1px solid red; */
             font-family: 'Press Start 2P', sans-serif;
         }
-        header{
+        #header{
             width: 100%;
             text-align: center;
             font-size: 2em
+        }
+
+        #scores {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75em;
+            padding: 0.4em 0;
         }
     </style>
 </head>
 <body>
     <div id="header">
         <div id="title">FlapJack</div>
+        <div id="scores">
+            <div>Best: <span id="bestScore">0</span></div>
+            <div>Your: <span id="yourScore">0</span></div>
+        </div>
     </div>
     <canvas id="canvas" width="431" height="768"></canvas>
 
@@ -35,9 +46,13 @@
        const birdWidth = 51;
        const birdHeight =36;
        const birdStartX = 50;
+       const birdNum = 3;
+       const birdAnimDelay = 10; // For smooth animation, should be a multiple of the birdNum, then add 1
+
        const pipeWidth = 78;
        const pipeHeight = 480;
-       const pipeGap = birdHeight * 3;
+       // const pipeGap = birdHeight * 3; (Hard Mode)
+       const pipeGap = birdHeight * 5;
        const pipeYOffset = 200;
 
        const gravity = 3;
@@ -47,23 +62,54 @@
 
        const pipeSpeed = 2;
 
-       let flapCount = 0
-       let flyHeight = (canvas.height / 2) - (birdHeight / 2);
-       let pipePos = canvas.width; 
-       let pipePos2 = canvas.width + ((canvas.width / 2) + (pipeWidth / 2));
-       let pipeYCenter1 = getPipeYCenter1();
-       let pipeYCenter2 = getPipeYCenter1();
+       let flapCount;
+       let flyHeight;
+       
+       let pipeXPos; 
+       let pipeXPos2;
+       let pipeYPos;
+       let pipeYPos2;
 
-       function getPipeYCenter1() {
-            return (
-                 (canvas.height / 2) 
-                 - Math.round(Math.random() * pipeYOffset)
-                 - pipeHeight
-                );
+       let pipeXY;
+
+       let frameCount;
+       let currBird;
+
+       let currScore = 0;
+       let bestScoreSoFar = 0;
+
+       let running;
+
+       function getNewPipeYPos() {
+            return (-1 * Math.round(Math.random() * pipeYOffset));
+       }
+
+       function setup() {
+            // Bird vars
+            flapCount = 10;
+            flyHeight = (canvas.height / 2) - (birdHeight / 2);
+            currBird = 0;
+
+            // Pipe vars
+            let pipeXPos = canvas.width; 
+            let pipeXPos2 = canvas.width + ((canvas.width / 2) + (pipeWidth / 2));
+            let pipeYPos = getNewPipeYPos();
+            let pipeYPos2 = getNewPipeYPos();
+
+            pipeXY = [
+            [pipeXPos, pipeYPos],
+            [pipeXPos2, pipeYPos2],
+            ];
+
+            frameCount = 0;
+            currScore = 0;
+            running = false;
        }
 
        function loop() {
-        // drawImage(image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight)
+            frameCount++;
+
+             // drawImage(image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight)
             // Background
             ctx.drawImage(img, 
                 0, 0, 
@@ -73,86 +119,103 @@
             );
            
             // Bird Flight
-            if (flapCount < flapDuration) {
-                if (flyHeight > 0) {
-                    flyHeight -= antiGravity;
+            if (running) {
+                if (flapCount < flapDuration) {
+                    if (flyHeight > 0) {
+                        flyHeight -= antiGravity;
+                    }
+                    flapCount++;
                 }
-                flapCount++;
+                else if (flyHeight < canvas.height - birdHeight) {
+                    flyHeight += gravity;
             }
+
+            currBird = (frameCount % birdAnimDelay) % birdNum;
+
+        }
             
-            else if (flyHeight < canvas.height - birdHeight) {
-                flyHeight += gravity;
-            }
            
             // Bird
             ctx.drawImage(img, 
-                canvas.width + 1, 0, 
+                canvas.width + 1, currBird * birdHeight, 
                 birdWidth, birdHeight, 
                 birdStartX, flyHeight, 
                 birdWidth, birdHeight
             );
+            // Pull out data into local variables for readability.
+            // Remember to write any changed values back in later. 
+            for (let i = 0; i < pipeXY.length; i++){
+                let xPos = pipeXY[i][0];
+                let yPos = pipeXY[i][1];
+
+                if (xPos > -pipeWidth) {
+                    xPos -= pipeSpeed;
+                }
+                else {
+                    // Reset Pipe 1
+                    xPos = canvas.width;
+                    yPos = getNewPipeYPos();
+                    currScore++;
+                    yourScore.innerHTML = currScore;
+                    if (currScore > bestScoreSoFar) {
+                        bestScoreSoFar = currScore;
+                        bestScore.innerHTML = bestScoreSoFar
+                    }
+                }
+                
+                // Upper Pipe
+                ctx.drawImage(img, 
+                    canvas.width + 1, (birdHeight * 3) + 1, 
+                    pipeWidth, pipeHeight, 
+                    xPos, yPos, 
+                    pipeWidth, pipeHeight
+                );
+
+                // Lower Pipe
+                let lowerPipeTop = pipeHeight + pipeGap + yPos;
+                ctx.drawImage(img, 
+                    canvas.width + pipeWidth + 1, (birdHeight * 3) + 1, 
+                    pipeWidth, pipeHeight, 
+                    xPos, lowerPipeTop,
+                    pipeWidth, pipeHeight
+                );
             
-            if (pipePos > -pipeWidth) {
-                pipePos -= pipeSpeed;
-            }
-            else {
-                // Reset Pipe 1
-                pipePos = canvas.width;
-                pipeYCenter1 = getPipeYCenter1();
-            }
+                // Write changed values back into the data structure
+                if (running) {
+                    pipeXY[i][0] = xPos;
+                    pipeXY[i][1] = yPos;
+                }
+                
+               
             
-            // Upper Pipe 1
-            ctx.drawImage(img, 
-                canvas.width + 1, (birdHeight * 3) + 1, 
-                pipeWidth, pipeHeight, 
-                pipePos, pipeYCenter1, 
-                pipeWidth, pipeHeight
-            );
-
-            // Lower Pipe 1
-            ctx.drawImage(img, 
-                canvas.width + pipeWidth + 1, (birdHeight * 3) + 1, 
-                pipeWidth, pipeHeight, 
-                pipePos, pipeHeight + pipeGap + pipeYCenter1,
-                pipeWidth, pipeHeight
-            );
-
-            if (pipePos2 > -pipeWidth) {
-                pipePos2 -= pipeSpeed;
+                // Collision ?
+                if (xPos < birdStartX + birdWidth) {
+                    if (yPos + pipeHeight > flyHeight || lowerPipeTop < flyHeight + birdHeight) {
+                        // console.log("COLLISION!");
+                        // setup();
+                        running = false;
+                    }
+                }
             }
-            else {
-                // Reset Pipe 2
-                pipePos2 = canvas.width;
-                pipeYCenter2 = getPipeYCenter1();
-            }
-
-             // Upper Pipe 2
-             ctx.drawImage(img, 
-                canvas.width + 1, (birdHeight * 3) + 1, 
-                pipeWidth, pipeHeight, 
-                pipePos2, pipeYCenter2, 
-                pipeWidth, pipeHeight
-            );
-
-            // Lower Pipe 2
-            ctx.drawImage(img, 
-                canvas.width + pipeWidth + 1, (birdHeight * 3) + 1, 
-                pipeWidth, pipeHeight, 
-                pipePos2, pipeHeight + pipeGap + pipeYCenter2,
-                pipeWidth, pipeHeight
-            );
 
             window.requestAnimationFrame(loop);
        }
+
+       setup();
        
        let ctx = canvas.getContext('2d');
        const img = new Image ();
        img.src = "flappy-bird-set.png";
        img.onload = loop;
 
+       // Hitting the spacebar will make the bird flap
        window.onkeydown = function(evt) {
             if (evt.code == "Space")
                 if (flyHeight > 0) flapCount = 0;
+                if (!running) {
+                    setup ();
+                    running = true;
+                }
        }
 
     </script>
